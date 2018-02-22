@@ -1,0 +1,27 @@
+{
+    "name": "photoncms/installer",
+    "description": "Photon CMS application installer.",
+    "keywords": ["photon", "cms", "laravel"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Milan Anđelković",
+            "email": "milan.andjelkovic@orangehilldev.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "PhotonCms\\Installer\\Console\\": "src/"
+        }
+    },
+    "require": {
+        "ext-zip": "*",
+        "guzzlehttp/guzzle": "~6.0",
+        "symfony/console": "~3.0|~4.0",
+        "symfony/filesystem": "~3.0|~4.0",
+        "symfony/process": "~3.0|~4.0"
+    },
+    "bin": [
+        "photon"
+    ]
+}
