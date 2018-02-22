@@ -5,6 +5,10 @@
     "license": "MIT",
     "authors": [
         {
+            "name": "Tihomir Opačić",
+            "email": "tihomir.opacic@orangehilldev.com"
+        },
+        {
             "name": "Milan Anđelković",
             "email": "milan.andjelkovic@orangehilldev.com"
         }
