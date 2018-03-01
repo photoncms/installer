@@ -8,10 +8,13 @@ use GuzzleHttp\Client;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\Question;
+use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
 
 class Installer extends Command
@@ -43,45 +46,62 @@ class Installer extends Command
             throw new RuntimeException('The Zip PHP extension is not installed. Please install it and try again.');
         }
 
-        $directory = ($input->getArgument('name')) ? getcwd().'/'.$input->getArgument('name') : getcwd();
+        $name = $input->getArgument('name') ? $input->getArgument('name') : 'photoncms';
+
+        $username = $this->askForUsername($input, $output);
+        $password = $this->askForPassword($input, $output);
+
+        if(!$this->testDbConnection($input, $output, $username, $password, $name)) {
+            $output->writeln('<error>...Connecting to database failed</error>');
+            return false;
+        }
+
+        $directory = getcwd().'/'.$name;
 
         $this->verifyApplicationDoesntExist($directory);
 
-        $output->writeln('<info>Crafting application...</info>');
+        $output->writeln('<info>...Crafting application</info>');
 
         $version = $this->getVersion($input);
 
         $this->download($zipFile = $this->makeFilename(), $version)
-             ->extract($zipFile, $directory)
+             ->extract($zipFile, $directory, $version)
              ->prepareWritableDirectories($directory, $output)
              ->cleanUp($zipFile);
 
-        // $composer = $this->findComposer();
+        $composer = $this->findComposer();
 
-        // $commands = [
-        //     $composer.' install --no-scripts',
-        //     $composer.' run-script post-root-package-install',
-        //     $composer.' run-script post-create-project-cmd',
-        //     $composer.' run-script post-autoload-dump',
-        // ];
+        $commands = [
+            $composer.' install --no-scripts',
+            $composer.' run-script post-root-package-install',
+            $composer.' run-script post-create-project-cmd',
+            $composer.' run-script post-autoload-dump',
+        ];
 
-        // if ($input->getOption('no-ansi')) {
-        //     $commands = array_map(function ($value) {
-        //         return $value.' --no-ansi';
-        //     }, $commands);
-        // }
+        if ($input->getOption('no-ansi')) {
+            $commands = array_map(function ($value) {
+                return $value.' --no-ansi';
+            }, $commands);
+        }
 
-        // $process = new Process(implode(' && ', $commands), $directory, null, null, null);
+        $process = new Process(implode(' && ', $commands), $directory, null, null, null);
 
-        // if ('\\' !== DIRECTORY_SEPARATOR && file_exists('/dev/tty') && is_readable('/dev/tty')) {
-        //     $process->setTty(true);
-        // }
+        if ('\\' !== DIRECTORY_SEPARATOR && file_exists('/dev/tty') && is_readable('/dev/tty')) {
+            $process->setTty(true);
+        }
 
-        // $process->run(function ($type, $line) use ($output) {
-        //     $output->write($line);
-        // });
+        $process->run(function ($type, $line) use ($output) {
+            $output->write($line);
+        });
 
-        // $output->writeln('<comment>Application ready! Build something amazing.</comment>');
+        $this->setEnvironmentValue("DB_DATABASE", $name, $directory);
+        $this->setEnvironmentValue("DB_USERNAME", $username, $directory);
+        $this->setEnvironmentValue("DB_PASSWORD", $password, $directory);
+        $output->writeln('<comment>...updated .env file</comment>');
+
+        exec("php ".$directory."/artisan photon:hard-reset");
+
+        $output->writeln('<comment>...Photon CMS Installed!</comment>');
     }
 
     /**
@@ -117,7 +137,7 @@ class Installer extends Command
     protected function download($zipFile, $version = 'master')
     {
         switch ($version) {
-            case 'develop':
+            case 'development':
                 $filename = 'development.zip';
                 break;
             case 'master':
@@ -137,9 +157,10 @@ class Installer extends Command
      *
      * @param  string  $zipFile
      * @param  string  $directory
+     * @param  string  $version
      * @return $this
      */
-    protected function extract($zipFile, $directory)
+    protected function extract($zipFile, $directory, $version)
     {
         $archive = new ZipArchive;
 
@@ -148,6 +169,10 @@ class Installer extends Command
         $archive->extractTo($directory);
 
         $archive->close();
+
+        $filesystem = new Filesystem();
+        $filesystem->mirror($directory."/cms-".$version, $directory);
+        $filesystem->remove($directory."/cms-".$version);
 
         return $this;
     }
@@ -197,7 +222,7 @@ class Installer extends Command
     protected function getVersion(InputInterface $input)
     {
         if ($input->getOption('dev')) {
-            return 'develop';
+            return 'development';
         }
 
         return 'master';
@@ -215,5 +240,113 @@ class Installer extends Command
         }
 
         return 'composer';
+    }
+
+    /**
+     * Prompt user for their db username.
+     *
+     * @param  \Symfony\Component\Console\Input\InputInterface  $input
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
+     * @return string
+     */
+    protected function askForUsername($input, $output)
+    {
+        $questionHelper = new QuestionHelper();
+        $question = new Question('<info>...What is your mysql username?</info>  ');
+        $username = $questionHelper->ask($input, $output, $question);
+
+        return $username;
+    }
+
+    /**
+     * Prompt user for their db password.
+     *
+     * @param  \Symfony\Component\Console\Input\InputInterface  $input
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
+     * @return string
+     */
+    protected function askForPassword($input, $output)
+    {
+        $questionHelper = new QuestionHelper();
+        $question = new Question('<info>...What is your mysql password?</info>  ');
+        $question->setHidden(true);
+        $password = $questionHelper->ask($input, $output, $question);
+
+        return $password;
+    }
+
+    /**
+     * Prompt user for their db password.
+     *
+     * @param  \Symfony\Component\Console\Input\InputInterface  $input
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
+     * @param  string  $database
+     * @return boolean
+     */
+    protected function confirmDatabase($input, $output, $database)
+    {
+        $questionHelper = new QuestionHelper();
+        $question = new ChoiceQuestion(
+            '<comment>...Database '.$database.' alerady exists. This action will empty it. Do you wish to continue?</comment>  ', 
+            [
+                1 => "yes", 
+                2 => "no"
+            ]
+        );
+        $answer = $questionHelper->ask($input, $output, $question);
+
+        if($answer == "yes")
+            return true;
+
+        return false;
+    }
+
+    protected function testDbConnection($input, $output, $username, $password, $database)
+    {
+        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+        // test connection, if invalid credentials return false
+        try {
+            $connection = mysqli_connect("localhost", $username, $password);
+        } catch (\mysqli_sql_exception $e) { 
+            return false;
+        }
+
+        // test database, if it doesn't exist create it
+        try {
+            $selectedDb = mysqli_select_db($connection, $database);
+        } catch (\mysqli_sql_exception $e) { 
+            $sql = 'CREATE DATABASE ' . $database;
+            mysqli_query($connection, $sql);
+            return true;
+        }
+
+        return $this->confirmDatabase($input, $output, $database);
+    }
+
+    protected function setEnvironmentValue($envKey, $envValue, $directory)
+    {
+        $envFile = $directory."/.env"; 
+
+        $str = file_get_contents($envFile);
+
+        switch ($envKey) {
+            case 'DB_DATABASE':
+                $oldValue = "dbname";
+                break;
+            case 'DB_USERNAME':
+                $oldValue = "username";
+                break;
+            case 'DB_PASSWORD':
+                $oldValue = "password";
+                break;
+            
+        }
+
+        $str = str_replace("{$envKey}={$oldValue}\n", "{$envKey}={$envValue}\n", $str);
+
+        $fp = fopen($envFile, 'w');
+        fwrite($fp, $str);
+        fclose($fp);
     }
 }
