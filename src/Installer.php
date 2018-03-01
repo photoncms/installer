@@ -97,11 +97,11 @@ class Installer extends Command
         $this->setEnvironmentValue("DB_DATABASE", $name, $directory);
         $this->setEnvironmentValue("DB_USERNAME", $username, $directory);
         $this->setEnvironmentValue("DB_PASSWORD", $password, $directory);
-        $output->writeln('<comment>...updated .env file</comment>');
+        $output->writeln('<info>...updated .env file</info>');
 
         exec("php ".$directory."/artisan photon:hard-reset");
 
-        $output->writeln('<comment>...Photon CMS Installed!</comment>');
+        $output->writeln('<info>...Photon CMS Installed!</info>');
     }
 
     /**
