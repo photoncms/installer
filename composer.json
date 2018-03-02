@@ -6,11 +6,11 @@
     "authors": [
         {
             "name": "Tihomir Opačić",
-            "email": "tihomir.opacic@orangehilldev.com"
+            "email": "tihomir.opacic@photonocms.com"
         },
         {
             "name": "Milan Anđelković",
-            "email": "milan.andjelkovic@orangehilldev.com"
+            "email": "milan.andjelkovic@photonocms.com"
         }
     ],
     "autoload": {
