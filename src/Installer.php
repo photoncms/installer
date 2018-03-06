@@ -145,7 +145,16 @@ class Installer extends Command
                 break;
         }
 
-        $response = (new Client)->get('https://ga-dev-tools.appspot.com/hit-builder/?v=1&t=event&tid=UA-1936460-37&cid=65ee52da-f6fa-4f0d-a1e5-d12dd4945679&ec=Downloads&ea=Installation%20via%20Installer%20Package');
+        $ga = (new Client)->request('POST', 'https://www.google-analytics.com/collect', [
+            'form_params' => [
+                'v' => '1',
+                't' => 'event',
+                'tid' => 'UA-1936460-37',
+                'cid' => '65ee52da-f6fa-4f0d-a1e5-d12dd4945679',
+                'ec' => 'Downloads',
+                'ea' => 'Installation via Installer Package',
+            ]
+        ]);
         
         $response = (new Client)->get('https://github.com/photoncms/cms/archive/'.$filename);
 
