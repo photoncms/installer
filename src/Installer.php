@@ -327,7 +327,7 @@ class Installer extends Command
         try {
             $selectedDb = mysqli_select_db($connection, $database);
         } catch (\mysqli_sql_exception $e) { 
-            $sql = 'CREATE DATABASE ' . $database;
+            $sql = 'CREATE DATABASE `' . $database . '`';
             mysqli_query($connection, $sql);
             return true;
         }
