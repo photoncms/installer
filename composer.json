@@ -1,7 +1,8 @@
 {
     "name": "photoncms/installer",
     "description": "Photon CMS application installer.",
-    "keywords": ["photon", "cms", "laravel"],
+    "version": "1.0.4",
+    "keywords": ["photon", "cms", "laravel", "installer"],
     "license": "MIT",
     "authors": [
         {

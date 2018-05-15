@@ -48,10 +48,11 @@ class Installer extends Command
 
         $name = $input->getArgument('name') ? $input->getArgument('name') : 'photoncms';
 
+        $hostname = $this->askForHost($input, $output);
         $username = $this->askForUsername($input, $output);
         $password = $this->askForPassword($input, $output);
 
-        if(!$this->testDbConnection($input, $output, $username, $password, $name)) {
+        if(!$this->testDbConnection($input, $output, $username, $password, $name, $hostname)) {
             $output->writeln('<error>...Connecting to database failed</error>');
             return false;
         }
@@ -95,6 +96,7 @@ class Installer extends Command
         });
 
         $this->setEnvironmentValue("DB_DATABASE", $name, $directory);
+        $this->setEnvironmentValue("DB_HOST", $hostname, $directory);
         $this->setEnvironmentValue("DB_USERNAME", $username, $directory);
         $this->setEnvironmentValue("DB_PASSWORD", $password, $directory);
         $output->writeln('<info>...updated .env file</info>');
@@ -155,7 +157,7 @@ class Installer extends Command
                 'ea' => 'Installation via Installer Package',
             ]
         ]);
-        
+
         $response = (new Client)->get('https://github.com/photoncms/cms/archive/'.$filename);
 
         file_put_contents($zipFile, $response->getBody());
@@ -254,6 +256,22 @@ class Installer extends Command
     }
 
     /**
+     * Prompt user for their db hostname.
+     *
+     * @param  \Symfony\Component\Console\Input\InputInterface  $input
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
+     * @return string
+     */
+    protected function askForHost($input, $output)
+    {
+        $questionHelper = new QuestionHelper();
+        $question = new Question('<info>...What is your mysql hostname? [localhost]</info>  ', 'localhost');
+        $hostname = $questionHelper->ask($input, $output, $question);
+
+        return $hostname;
+    }
+
+    /**
      * Prompt user for their db username.
      *
      * @param  \Symfony\Component\Console\Input\InputInterface  $input
@@ -263,7 +281,7 @@ class Installer extends Command
     protected function askForUsername($input, $output)
     {
         $questionHelper = new QuestionHelper();
-        $question = new Question('<info>...What is your mysql username?</info>  ');
+        $question = new Question('<info>...What is your mysql username? [root]</info>', 'root');
         $username = $questionHelper->ask($input, $output, $question);
 
         return $username;
@@ -279,7 +297,7 @@ class Installer extends Command
     protected function askForPassword($input, $output)
     {
         $questionHelper = new QuestionHelper();
-        $question = new Question('<info>...What is your mysql password?</info>  ');
+        $question = new Question('<info>...What is your mysql password? []</info>', '');
         $question->setHidden(true);
         $password = $questionHelper->ask($input, $output, $question);
 
@@ -298,9 +316,9 @@ class Installer extends Command
     {
         $questionHelper = new QuestionHelper();
         $question = new ChoiceQuestion(
-            '<comment>...Database '.$database.' alerady exists. This action will empty it. Do you wish to continue?</comment>  ', 
+            '<comment>...Database '.$database.' alerady exists. This action will empty it. Do you wish to continue?</comment>  ',
             [
-                1 => "yes", 
+                1 => "yes",
                 2 => "no"
             ]
         );
@@ -312,21 +330,21 @@ class Installer extends Command
         return false;
     }
 
-    protected function testDbConnection($input, $output, $username, $password, $database)
+    protected function testDbConnection($input, $output, $username, $password, $database, $hostname)
     {
         mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
         // test connection, if invalid credentials return false
         try {
-            $connection = mysqli_connect("localhost", $username, $password);
-        } catch (\mysqli_sql_exception $e) { 
+            $connection = mysqli_connect($hostname, $username, $password);
+        } catch (\mysqli_sql_exception $e) {
             return false;
         }
 
         // test database, if it doesn't exist create it
         try {
             $selectedDb = mysqli_select_db($connection, $database);
-        } catch (\mysqli_sql_exception $e) { 
+        } catch (\mysqli_sql_exception $e) {
             $sql = 'CREATE DATABASE `' . $database . '`';
             mysqli_query($connection, $sql);
             return true;
@@ -337,11 +355,14 @@ class Installer extends Command
 
     protected function setEnvironmentValue($envKey, $envValue, $directory)
     {
-        $envFile = $directory."/.env"; 
+        $envFile = $directory."/.env";
 
         $str = file_get_contents($envFile);
 
         switch ($envKey) {
+            case 'DB_HOST':
+                $oldValue = "localhost";
+                break;
             case 'DB_DATABASE':
                 $oldValue = "dbname";
                 break;
@@ -351,7 +372,7 @@ class Installer extends Command
             case 'DB_PASSWORD':
                 $oldValue = "password";
                 break;
-            
+
         }
 
         $str = str_replace("{$envKey}={$oldValue}\n", "{$envKey}={$envValue}\n", $str);
