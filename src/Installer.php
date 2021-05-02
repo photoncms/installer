@@ -381,6 +381,9 @@ class Installer extends Command
             case 'DB_HOST':
                 $oldValue = "localhost";
                 break;
+            case 'DB_PORT':
+                $oldValue = 3306;
+                break;
             case 'DB_DATABASE':
                 $oldValue = "dbname";
                 break;
@@ -393,8 +396,13 @@ class Installer extends Command
 
         }
 
-        $str = str_replace("{$envKey}={$oldValue}\n", "{$envKey}={$envValue}\n", $str);
-
+        # append port config if not exist
+        if ($envKey === 'DB_HOST' && strpos($str, 'DB_PORT') === false) {
+            $str = str_replace("{$envKey}={$oldValue}\n", "{$envKey}={$envValue}\nDB_PORT=3306\n", $str);
+        } else {
+            $str = str_replace("{$envKey}={$oldValue}\n", "{$envKey}={$envValue}\n", $str);
+        }
+        
         $fp = fopen($envFile, 'w');
         fwrite($fp, $str);
         fclose($fp);
