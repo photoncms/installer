@@ -49,10 +49,11 @@ class Installer extends Command
         $name = $input->getArgument('name') ? $input->getArgument('name') : 'photoncms';
 
         $hostname = $this->askForHost($input, $output);
+        $port = $this->askForPort($input, $output);
         $username = $this->askForUsername($input, $output);
         $password = $this->askForPassword($input, $output);
 
-        if(!$this->testDbConnection($input, $output, $username, $password, $name, $hostname)) {
+        if(!$this->testDbConnection($input, $output, $username, $password, $name, $hostname, $port)) {
             $output->writeln('<error>...Connecting to database failed</error>');
             return false;
         }
@@ -97,6 +98,7 @@ class Installer extends Command
 
         $this->setEnvironmentValue("DB_DATABASE", $name, $directory);
         $this->setEnvironmentValue("DB_HOST", $hostname, $directory);
+        $this->setEnvironmentValue("DB_PORT", $port, $directory);
         $this->setEnvironmentValue("DB_USERNAME", $username, $directory);
         $this->setEnvironmentValue("DB_PASSWORD", $password, $directory);
         $output->writeln('<info>...updated .env file</info>');
@@ -272,6 +274,22 @@ class Installer extends Command
     }
 
     /**
+     * Prompt user for their db port.
+     *
+     * @param  \Symfony\Component\Console\Input\InputInterface  $input
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
+     * @return int
+     */
+    protected function askForPort($input, $output)
+    {
+        $questionHelper = new QuestionHelper();
+        $question = new Question('<info>...What is your mysql port? [3306]</info>  ', 3306);
+        $port = $questionHelper->ask($input, $output, $question);
+
+        return $port;
+    }
+
+    /**
      * Prompt user for their db username.
      *
      * @param  \Symfony\Component\Console\Input\InputInterface  $input
@@ -330,13 +348,13 @@ class Installer extends Command
         return false;
     }
 
-    protected function testDbConnection($input, $output, $username, $password, $database, $hostname)
+    protected function testDbConnection($input, $output, $username, $password, $database, $hostname, $port)
     {
         mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
         // test connection, if invalid credentials return false
         try {
-            $connection = mysqli_connect($hostname, $username, $password);
+            $connection = mysqli_connect($hostname, $username, $password, null, $port);
         } catch (\mysqli_sql_exception $e) {
             return false;
         }
